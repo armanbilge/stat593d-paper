@@ -26,27 +26,32 @@ class PSMC(MultinomialHMM):
         n = self.n_components
         tau = self.tau
         rho = self.rho
-        alpha = np.append([1], np.exp(np.cumsum(tau / lambd)))
+        alpha = np.append([1], np.exp(-np.cumsum(tau / lambd)))
         mdiffalpha = - np.diff(alpha)
-        beta = np.append([0], lambd * np.cumsum(1 / alpha))
+        beta = np.append([0], np.cumsum(lambd[:-1] * np.diff(1 / alpha[:-1])))
         C_pi = np.sum(lambd * mdiffalpha)
         C_sigma = 1 / (C_pi * rho) + 0.5
-        pi = (mdiffalpha * (np.append([0], tau) + lambd) - alpha[1:] * tau) / C_pi
+        alphaxtau = alpha[1:] * tau
+        alphaxtau[-1] = 0
+        pi = (mdiffalpha * (np.append([0], np.cumsum(tau))[:-1] + lambd) - alphaxtau) / C_pi
         sigma = (mdiffalpha / (C_pi * rho) + pi / 2) / C_sigma
 
-        w = beta - lambd / alpha
+        w = beta - lambd / alpha[:-1]
         z = mdiffalpha * w + tau
-        d = (mdiffalpha ** 2 * w + w * lambd * mdiffalpha - 2 * alpha[1:] * tau) / (C_pi * pi)
+        d = (mdiffalpha * mdiffalpha * w + 2 * lambd * mdiffalpha - 2 * alphaxtau) / (C_pi * pi)
         def f(k, l):
             if k == l:
                 return d[k]
             elif l < k:
                 return mdiffalpha[k] / (C_pi * pi[k]) * z[l]
-            elif k > l:
+            elif l > k:
                 return mdiffalpha[l] / (C_pi * pi[k]) * z[k]
-        Q = np.fromfunction(f, (n, n))
+        Q = np.zeros((n, n))
+        for k in range(n):
+            for l in range(n):
+                Q[k,l] = f(k, l)
         z = pi / (C_sigma * sigma)
-        P = z * Q + np.diag(1 - z)
+        P = z[:,np.newaxis] * Q + np.diag(1 - z)
         e = np.zeros((n, 2))
         e[:,1] = (1 - z) ** (theta / rho)
         e[:,0] = 1 - e[:,1]
