@@ -63,7 +63,8 @@ class PSMC(MultinomialHMM):
     def _do_mstep(self, stats):
         def Q(lambd):
             self._set_lambda(np.abs(lambd))
-            # TODO
-        res = fmin(Q, self.lambd, ftol=self.tol, full_output=self.verbose, disp=self.verbpose)
+            z = (('start', self.startprob_), ('trans', self.transmat_), ('obs', self.emissionprob_))
+            return - sum(np.sum(stats[stat] * np.log(p)) for stat, p in z)
+        res = fmin(Q, self.lambd, ftol=self.tol, full_output=self.verbose, disp=self.verbose)
         lambd = np.abs(res.xopt)
         self._set_lambda(lambd)
